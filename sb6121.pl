@@ -1,86 +1,149 @@
 #!/usr/bin/perl
-# Retrieve signal diagnostics from a Motorola Surfboard 6121 cable modem
+# Retrieve signal diagnostics from a Motorola Surfboard 6120/6121 cable modem
 # for use with Cacti
 #
 # Copy to an appropriate location, e.g. /usr/local/share/cacti/scripts/
 
 use strict;
+use Getopt::Std;
 
 my %data;
+my $body;
 my $hostname;
+my %opts;
 
-# Default to '192.168.100.1' if no hostname specified
-if ($ARGV[0] ne '')
-  {
-    $hostname = $ARGV[0];
+getopt('fh', \%opts);
+
+if ($opts{'f'}) {
+  open FILE, "<" . $opts{'f'};
+  $body = do { local $/; <FILE> };
+}
+else {
+  if ($opts{'h'}) {
+    $hostname = $opts{'h'};
   }
-else
-  {
+  else {
     $hostname = '192.168.100.1';
   }
 
-my $URL='http://' . $hostname . '/cmSignalData.htm';
+  my $URL='http://' . $hostname . '/cmSignalData.htm';
+  $body = `GET -t 10 $URL`;
+}
 
-# Fetch data
-my $body = `GET $URL`;
+# Parse Downstream data
+if ($body =~ /<CENTER>.*<FONT color=#ffffff>Downstream <\/FONT>(.*?)<\/CENTER>/s) {
+  my $downstream = $1;
 
-# Isolate Downstream data
-my ($junk, $downstream) =
-  split(/<TH><FONT color=#ffffff>Downstream <\/FONT><\/TH>/, $body);
+  # Downstream Signal to Noise Ratios
+  if ($downstream =~ /<TR><TD>Signal to Noise Ratio<\/TD>(.*?)<\/TR>/s) {
+    my $downstream_snr = $1;
 
-# Isolate Upstream data
-my ($downstream, $upstream) =
-  split(/<TH><FONT color=#ffffff>Upstream <\/FONT><\/TH>/, $downstream);
+    my $i = 0;
+    while ($downstream_snr =~ /<TD>([0-9]+) dB&nbsp;<\/TD>/g) {
+      $i++;
+      $data{'downstream_snr_' . $i} = $1;
+    }
+    die "Didn't find at least one channel" unless ($i > 0);
+  }
+  else {
+    die "Didn't find downstream signal to noise ratios";
+  }
 
-# Isolate Signal Stats (Codewords) data
-my ($upstream, $codewords) =
-  split(/<TH><FONT color=#ffffff>Signal Stats \(Codewords\)<\/FONT><\/TH>/,
-        $upstream);
+  # Downstream Power Levels
+  if ($downstream =~ /<TR><TD>Power Level.*?<\/TR>(.*?)<\/TR>/s) {
+    my $downstream_power = $1;
+    print "downstream_power = \"$downstream_power\"";
+    my $i = 0;
+    while ($downstream_power =~ /<TD>(-?[0-9]+) dBmV\n&nbsp;<\/TD>/gs) {
+      $i++;
+      $data{'downstream_power_' . $i} = $1;
+    }
+    die "Didn't find at least one channel" unless ($i > 0);
+  }
+  else {
+    die "Didn't find downstream power levels";
+  }
 
-# Downstream SNR
-my ($junk, $down_snr) = split(/Signal to Noise Ratio<\/TD>\n<TD>/, $downstream);
-($data{'down_snr_1'}, $data{'down_snr_2'}, $data{'down_snr_3'}, $down_snr) =
-  split(/ dB&nbsp;<\/TD><TD>/, $down_snr);
-($data{'down_snr_4'}, $down_snr) = split(/ dB&nbsp;<\/TD><\/TR>/, $down_snr);
+}
+else {
+  die "Didn't find downstream data";
+}
 
-# Downstream Power Level
-my ($junk, $down_power) = split(/Power Level.*<\/TABLE><\/TD>\n<TD>/,
-                                $down_snr);
- 
-($data{'down_power_1'}, $data{'down_power_2'}, $data{'down_power_3'},
-  $down_power) =
-    split(/ dBmV\n&nbsp;<\/TD><TD>/, $down_power);
-($data{'down_power_4'}, $down_power) = split(/ dBmV\n&nbsp;<\/TD><\/TR>/, $down_power);
 
-# Upstream Power Level
-my ($junk, $upstream) = split(/Power Level<\/TD>\n<TD>/, $upstream);
-($data{'up_power'}, $junk) = split(/ dBmV/, $upstream);
+# Parse Upstream data
+if ($body =~ /<CENTER>.*<FONT color=#ffffff>Upstream <\/FONT>(.*?)<\/CENTER>/s) {
+  my $upstream = $1;
 
-# Isolate Codewords
-my ($junk, $unerrored) = split(/Total Unerrored Codewords<\/TD>\n<TD>/,
-                               $codewords);
-my ($unerrored, $correctable) =
-  split(/Total Correctable Codewords<\/TD>\n<TD>/, $unerrored);
-my ($correctable, $uncorrectable) =
-  split(/Total Uncorrectable Codewords<\/TD>\n<TD>/, $correctable);
+  # Upstream Power Levels
+  if ($upstream =~ /<TR><TD>Power Level(.*?)<\/TR>/s) {
+    my $upstream_power = $1;
+    my $i = 0;
+    while ($upstream_power =~ /<TD>([0-9]+) dBmV&nbsp;<\/TD>/gs) {
+      $i++;
+      $data{'upstream_power_' . $i} = $1;
+    }
+    die "Didn't find at least one channel" unless ($i > 0);
+  }
+  else {
+    die "Didn't find upstream power levels";
+  }
 
-# Unerrored Codewords
-($data{'unerrored_1'}, $data{'unerrored_2'}, $data{'unerrored_3'}, $unerrored) =
-  split(/&nbsp;<\/TD><TD>/, $unerrored);
-($data{'unerrored_4'}, $junk) =
-  split(/&nbsp;/, $unerrored);
+}
+else {
+  die "Didn't find upstream data";
+}
 
-# Correctable Codewords
-($data{'correctable_1'}, $data{'correctable_2'}, $data{'correctable_3'}, $correctable) =
-  split(/&nbsp;<\/TD><TD>/, $correctable);
-($data{'correctable_4'}, $junk) =
-  split(/&nbsp;/, $correctable);
 
-# Uncorrectable
-($data{'uncorrectable_1'}, $data{'uncorrectable_2'}, $data{'uncorrectable_3'},
-  $uncorrectable) =
-    split(/&nbsp;<\/TD><TD>/, $uncorrectable);
-($data{'uncorrectable_4'}, $junk) = split(/&nbsp;/, $uncorrectable);
+# Parse Signal Stats (Codewords)
+if ($body =~ /<CENTER>.*<FONT color=#ffffff>Signal Stats \(Codewords\)<\/FONT>(.*?)<\/CENTER>/s) {
+  my $signal_stats = $1;
+
+  # Total Unerrored Codewords
+  if ($signal_stats =~ /<TR><TD>Total Unerrored Codewords<\/TD>(.*?)<\/TR>/s) {
+    my $unerrored_codewords = $1;
+    my $i = 0;
+    while ($unerrored_codewords =~ /<TD>([0-9]+)&nbsp;<\/TD>/gs) {
+      $i++;
+      $data{'unerrored_codewords_' . $i} = $1;
+    }
+    die "Didn't find at least one channel" unless ($i > 0);
+  }
+  else {
+    die "Didn't find unerrored codeword counters";
+  }
+
+  # Total Correctable Codewords
+  if ($signal_stats =~ /<TR><TD>Total Correctable Codewords<\/TD>(.*?)<\/TR>/s) {
+    my $correctable_codewords = $1;
+    my $i = 0;
+    while ($correctable_codewords =~ /<TD>([0-9]+)&nbsp;<\/TD>/gs) {
+      $i++;
+      $data{'correctable_codewords_' . $i} = $1;
+    }
+    die "Didn't find at least one channel" unless ($i > 0);
+  }
+  else {
+    die "Didn't find correctable codeword counters";
+  }
+
+  # Total Uncorrectable Codewords
+  if ($signal_stats =~ /<TR><TD>Total Uncorrectable Codewords<\/TD>(.*?)<\/TR>/s) {
+    my $uncorrectable_codewords = $1;
+    my $i = 0;
+    while ($uncorrectable_codewords =~ /<TD>([0-9]+)&nbsp;<\/TD>/gs) {
+      $i++;
+      $data{'uncorrectable_codewords_' . $i} = $1;
+    }
+    die "Didn't find at least one channel" unless ($i > 0);
+  }
+  else {
+    die "Didn't find uncorrectable codeword counters";
+  }
+}
+else {
+  die "Didn't find signal stats";
+}
+
 
 # Output
 my @pairs;

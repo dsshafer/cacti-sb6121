@@ -52,7 +52,6 @@ if ($body =~ /<CENTER>.*<FONT color=#ffffff>Downstream <\/FONT>(.*?)<\/CENTER>/s
   # Downstream Power Levels
   if ($downstream =~ /<TR><TD>Power Level.*?<\/TR>(.*?)<\/TR>/s) {
     my $downstream_power = $1;
-    print "downstream_power = \"$downstream_power\"";
     my $i = 0;
     while ($downstream_power =~ /<TD>(-?[0-9]+) dBmV\n&nbsp;<\/TD>/gs) {
       $i++;

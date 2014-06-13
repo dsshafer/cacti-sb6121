@@ -53,9 +53,9 @@ if ($body =~ /<CENTER>.*<FONT color=#ffffff>Downstream <\/FONT>(.*?)<\/CENTER>/s
   if ($downstream =~ /<TR><TD>Power Level.*?<\/TR>(.*?)<\/TR>/s) {
     my $downstream_power = $1;
     my $i = 0;
-    while ($down_power =~ /<TD>(-?[0-9]+) dBmV\n&nbsp;<\/TD>/gs) {
+    while ($downstream_power =~ /<TD>(-?[0-9]+) dBmV\n&nbsp;<\/TD>/gs) {
       $i++;
-      $data{'downstream_power_' . $i} = $1;
+      $data{'down_power_' . $i} = $1;
     }
     die "Didn't find at least one channel" unless ($i > 0);
   }

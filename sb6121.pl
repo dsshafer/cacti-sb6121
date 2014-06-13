@@ -41,7 +41,7 @@ if ($body =~ /<CENTER>.*<FONT color=#ffffff>Downstream <\/FONT>(.*?)<\/CENTER>/s
     my $i = 0;
     while ($downstream_snr =~ /<TD>([0-9]+) dB&nbsp;<\/TD>/g) {
       $i++;
-      $data{'downstream_snr_' . $i} = $1;
+      $data{'down_snr_' . $i} = $1;
     }
     die "Didn't find at least one channel" unless ($i > 0);
   }
@@ -53,7 +53,7 @@ if ($body =~ /<CENTER>.*<FONT color=#ffffff>Downstream <\/FONT>(.*?)<\/CENTER>/s
   if ($downstream =~ /<TR><TD>Power Level.*?<\/TR>(.*?)<\/TR>/s) {
     my $downstream_power = $1;
     my $i = 0;
-    while ($downstream_power =~ /<TD>(-?[0-9]+) dBmV\n&nbsp;<\/TD>/gs) {
+    while ($down_power =~ /<TD>(-?[0-9]+) dBmV\n&nbsp;<\/TD>/gs) {
       $i++;
       $data{'downstream_power_' . $i} = $1;
     }
@@ -79,7 +79,7 @@ if ($body =~ /<CENTER>.*<FONT color=#ffffff>Upstream <\/FONT>(.*?)<\/CENTER>/s) 
     my $i = 0;
     while ($upstream_power =~ /<TD>([0-9]+) dBmV&nbsp;<\/TD>/gs) {
       $i++;
-      $data{'upstream_power_' . $i} = $1;
+      $data{'up_power_' . $i} = $1;
     }
     die "Didn't find at least one channel" unless ($i > 0);
   }
